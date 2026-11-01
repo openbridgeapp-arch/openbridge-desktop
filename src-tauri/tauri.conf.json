@@ -1,27 +1,12 @@
 {
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "OpenBridge",
+  "version": "1.0.0",
+  "identifier": "com.openbridge.desktop",
   "build": {
-    "distDir": "../src",
-    "devPath": "../src"
+    "frontendDist": "../src"
   },
-  "package": {
-    "productName": "OpenBridge",
-    "version": "1.0.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "shell": {
-        "open": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.openbridge.desktop",
-      "icon": ["icons/icon.png"]
-    },
-    "security": {
-      "csp": null
-    },
+  "app": {
     "windows": [
       {
         "title": "OpenBridge",
@@ -30,6 +15,14 @@
         "minWidth": 900,
         "minHeight": 600
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": ["icons/icon.png"]
   }
 }
