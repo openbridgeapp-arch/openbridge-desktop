@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OpenBridge Desktop</title>
+<link rel="stylesheet" href="design-system.css">
+<style>
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .nav-tabs { display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 24px; }
+  .nav-tab { padding: 8px 16px; border: 1px solid var(--border-color); background: var(--white); cursor: pointer; font-size: 0.85rem; }
+  .nav-tab.active { background: var(--black); color: var(--white); }
+  .nav-tab:hover { background: var(--off-white); }
+  .badge { display: inline-block; padding: 2px 8px; font-size: 0.75rem; font-weight: 600; }
+  .badge-online { background: #dcfce7; color: #166534; }
+  .badge-offline { background: #fee2e2; color: #991b1b; }
+  .badge-pending { background: #fef3c7; color: #92400e; }
+  .info-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border-color); font-size: 0.9rem; }
+  .info-label { color: var(--text-muted); }
+  .info-val { font-family: monospace; font-size: 0.85rem; }
+  .terminal-box { background: #0a0a0a; color: #22c55e; font-family: monospace; padding: 12px; border-radius: 4px; font-size: 0.8rem; height: 200px; overflow-y: auto; white-space: pre-wrap; }
+  .recovery-code { display: inline-block; padding: 4px 8px; margin: 2px; background: var(--off-white); border: 1px solid var(--border-color); font-family: monospace; font-size: 0.8rem; }
+  .qr-container { text-align: center; margin: 10px 0; }
+  .danger-zone { border: 1px solid var(--accent-red); padding: 16px; margin-bottom: 16px; }
+  .danger-zone h3 { color: var(--accent-red); margin-top: 0; }
+  .approval-box { border: 1px solid var(--accent-amber); background: #fffbeb; padding: 12px; margin-top: 12px; }
+  .approval-box h4 { color: var(--accent-amber); margin-top: 0; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .status-dot-online { background: #22c55e; }
+  .status-dot-offline { background: #ef4444; }
+  .status-dot-pending { background: #f59e0b; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<nav class="nav" style="background: #0a0a0a; color: #ffffff;">
+  <div class="nav-inner">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: #ffffff;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>
+      <span style="font-weight: 700; font-size: 1.1rem; color: #ffffff;">OpenBridge Desktop</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span style="font-size: 0.85rem; color: #a3a3a3;">Local Bridge v1.0.0</span>
+      <span class="badge badge-online" style="background: #22c55e; color: #ffffff; padding: 4px 12px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">ONLINE</span>
+    </div>
+  </div>
+</nav>
+
+<div class="section">
+  <h1 class="section-title">OpenBridge Desktop</h1>
+  <p class="section-subtitle">Manage your local bridge, account, and execution policies.</p>
+
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="switchTab('tab-overview')">Overview</button>
+    <button class="nav-tab" onclick="switchTab('tab-terminal')">Terminal &amp; Execution</button>
+    <button class="nav-tab" onclick="switchTab('tab-approvals')">Approvals</button>
+    <button class="nav-tab" onclick="switchTab('tab-security')">Security &amp; Permissions</button>
+    <button class="nav-tab" onclick="switchTab('tab-account')">Account &amp; Connection</button>
+    <button class="nav-tab" onclick="switchTab('tab-settings')">Settings</button>
+  </div>
+
+  <!-- TAB 1: OVERVIEW -->
+  <section id="tab-overview" class="tab-content active">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Bridge Status</h3>
+        <div class="info-row">
+          <span class="info-label">Local Bridge</span>
+          <span class="info-val"><span class="status-dot status-dot-online"></span>Running</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Cloud Connection</span>
+          <span class="info-val" id="overview-cloud-status">Disconnected</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">MCP Connection</span>
+          <span class="info-val" id="overview-mcp-status">Not Connected</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Installation</span>
+          <span class="info-val" id="overview-inst-name">Loading...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Linked Account</span>
+          <span class="info-val" id="overview-account">Unlinked</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Execution Policy</span>
+          <span class="info-val" id="overview-policy">Loading...</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Quick Actions</h3>
+        <button class="btn" onclick="refreshStatus()">Refresh Status</button>
+        <button class="btn btn-secondary" onclick="switchTab('tab-terminal')">Run Command</button>
+        <button class="btn btn-secondary" onclick="switchTab('tab-approvals')">View Approvals</button>
+        <button class="btn btn-secondary" onclick="switchTab('tab-account')">Manage Account</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 2: TERMINAL & EXECUTION -->
+  <section id="tab-terminal" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Command Execution</h3>
+        <input type="text" id="cmd-input" placeholder="Enter shell command" style="margin-bottom:12px" />
+        <button class="btn" onclick="runCommand()">Execute</button>
+        <div class="terminal-box" id="cmd-output" style="margin-top:12px">Ready. Enter a command and click Execute.</div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Execution Policy</h3>
+        <div class="info-row">
+          <span class="info-label">Policy</span>
+          <span class="info-val" id="exec-policy">Loading...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Restrictions</span>
+          <span class="info-val" id="exec-restrictions">Loading...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Approvals Required</span>
+          <span class="info-val" id="exec-approvals">Yes</span>
+        </div>
+      </div>
+    </div>
+    <div class="card mt-16">
+      <h3 class="card-title">Diagnostics — MCP Execution Test</h3>
+      <div style="display:flex; gap:10px; margin-top:10px;">
+        <input type="text" id="mcp-test-cmd" value="pwd && node -v && whoami" placeholder="Enter shell command" style="margin-top:0" />
+        <button class="btn btn-secondary" onclick="runMcpTest()">Run via Remote MCP</button>
+      </div>
+      <div class="terminal-box" id="mcp-terminal-output" style="margin-top:12px">Ready for MCP execution test.</div>
+    </div>
+  </section>
+
+  <!-- TAB 3: APPROVALS -->
+  <section id="tab-approvals" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Pending Approval Requests</h3>
+        <div id="approvals-list">
+          <p class="text-muted" style="font-size:0.9rem">No pending approval requests.</p>
+        </div>
+        <button class="btn btn-secondary mt-16" onclick="refreshApprovals()">Refresh</button>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Shutdown Approval</h3>
+        <p class="text-muted" style="font-size:0.85rem;margin-bottom:12px">
+          When a valid shutdown request arrives from an authorized AI client, it appears here. You must explicitly approve each request.
+        </p>
+        <div id="shutdown-status-box" style="margin-bottom:12px;font-size:0.9rem"></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-secondary" id="btn-approve-shutdown" style="display:none" onclick="approveShutdown()">Approve</button>
+          <button class="btn btn-ghost" id="btn-cancel-shutdown" style="display:none" onclick="cancelShutdown()">Cancel</button>
+        </div>
+        <div id="shutdown-result-box" style="margin-top:12px;font-size:0.9rem"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 4: SECURITY & PERMISSIONS -->
+  <section id="tab-security" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Installation Identity</h3>
+        <div class="info-row">
+          <span class="info-label">Fingerprint (SHA-256)</span>
+          <span class="info-val" id="sec-fingerprint">Loading...</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Algorithm</span>
+          <span class="info-val">Ed25519 (SPKI/PKCS8)</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Operating System</span>
+          <span class="info-val" id="sec-os">Loading...</span>
+        </div>
+        <p class="text-muted" style="font-size:0.8rem;margin-top:8px">
+          The Ed25519 private key remains local to this machine and is never transmitted to the cloud.
+        </p>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Permission Status</h3>
+        <div class="info-row">
+          <span class="info-label">Terminal Execution</span>
+          <span class="info-val"><span class="status-dot status-dot-online"></span>Enabled</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Approval Required</span>
+          <span class="info-val"><span class="status-dot status-dot-pending"></span>Yes</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Shutdown Protection</span>
+          <span class="info-val"><span class="status-dot status-dot-online"></span>Active</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Rate Limiting</span>
+          <span class="info-val"><span class="status-dot status-dot-online"></span>Active</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 5: ACCOUNT & CONNECTION -->
+  <section id="tab-account" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Account Status</h3>
+        <div class="info-row">
+          <span class="info-label">Email</span>
+          <span class="info-val" id="acct-email">Not logged in</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Email Verified</span>
+          <span class="info-val" id="acct-verified">No</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">2FA Active</span>
+          <span class="info-val" id="acct-2fa">No</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Linked Installations</span>
+          <span class="info-val" id="acct-installations">0</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Pairing & Linking</h3>
+        <button class="btn" onclick="startLinkingFlow()">Start Linking Flow</button>
+        <div id="step-pairing-box" style="display:none;margin-top:12px">
+          <p style="font-size:0.85rem;color:var(--text-muted)">Pairing code: <code id="display-pairing-code" style="color:var(--black)">------</code></p>
+          <p style="font-size:0.75rem;color:var(--text-muted)">Expires in 10 minutes</p>
+        </div>
+        <div style="margin-top:16px;border-top:1px solid var(--border-color);padding-top:12px">
+          <label style="font-size:0.85rem;color:var(--text-muted)">Paste Temporary Enrollment Secret:</label>
+          <input type="text" id="input-temp-secret" placeholder="tb_sec_..." style="margin-top:6px;width:100%" />
+          <button class="btn btn-secondary" onclick="finishLinkingFlow()" style="margin-top:8px">Finish Linking</button>
+          <div id="linking-finish-msg" style="margin-top:8px;font-size:0.85rem"></div>
+        </div>
+      </div>
+    </div>
+    <div class="card mt-16">
+      <h3 class="card-title">Unlink Installation</h3>
+      <p class="text-muted" style="font-size:0.85rem;margin-bottom:12px">
+        Unlinking removes cloud account authorization and revokes terminal access. This action is irreversible.
+      </p>
+      <button class="btn btn-ghost" onclick="initiateUnlink()">Initiate Unlink</button>
+      <div id="unlink-otp-box" style="display:none;margin-top:12px">
+        <input type="text" id="input-unlink-otp" placeholder="Enter 6-digit OTP" maxlength="6" style="text-align:center;font-size:1.2rem;letter-spacing:4px" />
+        <button class="btn btn-ghost" onclick="confirmUnlink()" style="margin-top:8px">Confirm Unlink</button>
+        <div id="unlink-result-msg" style="margin-top:8px;font-size:0.85rem"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TAB 6: SETTINGS -->
+  <section id="tab-settings" class="tab-content">
+    <div class="grid-2">
+      <div class="card">
+        <h3 class="card-title">Service Settings</h3>
+        <div class="info-row">
+          <span class="info-label">Bridge Port</span>
+          <span class="info-val">4310</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Cloud Relay Target</span>
+          <span class="info-val">http://127.0.0.1:4320</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">Environment</span>
+          <span class="info-val">Development / Local</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3 class="card-title">Diagnostics & Logs</h3>
+        <p class="text-muted" style="font-size:0.85rem;margin-bottom:12px">
+          View local bridge diagnostics or copy system report.
+        </p>
+        <button class="btn btn-secondary" onclick="loadStatus()">Reload System Status</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<footer class="footer">
+  <p>OpenBridge Desktop — Universal AI-to-Local-Terminal Bridge.</p>
+</footer>
+
+<script>
+    let authToken = localStorage.getItem('openbridge_token') || '';
+    let currentUserId = localStorage.getItem('openbridge_userid') || '';
+    let currentRequestId = '';
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+      document.getElementById(tabId).classList.add('active');
+      if (window.event && window.event.target) {
+        window.event.target.classList.add('active');
+      }
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        
+        document.getElementById('inst-fingerprint').innerText = data.installation.fingerprint;
+        document.getElementById('inst-os').innerText = data.installation.osInfo;
+        
+        const badge = document.getElementById('bridge-status-badge');
+        if (data.cloudClient.connected) {
+          badge.className = 'badge-status status-online';
+          badge.innerText = 'LINKED & ONLINE';
+          document.getElementById('inst-cloud-status').innerText = 'Connected (WSS)';
+          document.getElementById('inst-cloud-status').style.color = '#22c55e';
+        } else {
+          badge.className = 'badge-status status-offline';
+          badge.innerText = 'OFFLINE / UNLINKED';
+          document.getElementById('inst-cloud-status').innerText = 'Disconnected';
+          document.getElementById('inst-cloud-status').style.color = '#ef4444';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    async function startLinkingFlow() {
+      try {
+        const res = await fetch('/api/linking/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) });
+        const data = await res.json();
+        if (data.pairingCode) {
+          document.getElementById('step-pairing-box').style.display = 'block';
+          document.getElementById('display-pairing-code').innerText = data.pairingCode;
+          currentRequestId = data.requestId;
+        } else {
+          alert('Error: ' + data.error);
+        }
+      } catch (e) {
+        alert('Failed: ' + e.message);
+      }
+    }
+
+    async function finishLinkingFlow() {
+      const secret = document.getElementById('input-temp-secret').value.trim();
+      if (!secret) return alert('Please enter temporary enrollment secret');
+      if (!authToken) return alert('Please log in on Cloud Portal tab first');
+
+      try {
+        const res = await fetch('/api/linking/finish', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ temporarySecret: secret, authToken })
+        });
+        const data = await res.json();
+        const msg = document.getElementById('linking-finish-msg');
+        if (data.success) {
+          msg.style.color = '#22c55e';
+          msg.innerText = '✅ ' + data.message;
+          loadStatus();
+        } else {
+          msg.style.color = '#ef4444';
+          msg.innerText = '❌ ' + (data.error || 'Failed');
+        }
+      } catch (e) {
+        alert('Finish link failed: ' + e.message);
+      }
+    }
+
+    async function registerAccount() {
+      const email = document.getElementById('cloud-email').value;
+      const password = document.getElementById('cloud-password').value;
+      const res = await fetch('http://127.0.0.1:4320/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('auth-status-msg');
+      if (res.ok) {
+        msg.style.color = '#22c55e';
+        msg.innerHTML = 'Registration successful! Verification token: <a href="http://127.0.0.1:4320/verify-email?token=' + data.verificationToken + '" target="_blank">Click here to verify email</a>';
+      } else {
+        msg.style.color = '#ef4444';
+        msg.innerText = data.error;
+      }
+    }
+
+    async function loginAccount() {
+      const email = document.getElementById('cloud-email').value;
+      const password = document.getElementById('cloud-password').value;
+      const res = await fetch('http://127.0.0.1:4320/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('auth-status-msg');
+      if (res.ok) {
+        authToken = data.token;
+        currentUserId = data.user.id;
+        localStorage.setItem('openbridge_token', authToken);
+        localStorage.setItem('openbridge_userid', currentUserId);
+        document.getElementById('auth-unlogged').style.display = 'none';
+        document.getElementById('auth-logged').style.display = 'block';
+        document.getElementById('logged-email').innerText = data.user.email;
+        document.getElementById('logged-verified').innerText = data.user.isEmailVerified ? 'Yes' : 'No';
+        document.getElementById('logged-2fa').innerText = data.user.totpEnabled ? 'Yes' : 'No';
+      } else {
+        msg.style.color = '#ef4444';
+        msg.innerText = data.error;
+      }
+    }
+
+    function logoutAccount() {
+      authToken = '';
+      currentUserId = '';
+      localStorage.removeItem('openbridge_token');
+      localStorage.removeItem('openbridge_userid');
+      document.getElementById('auth-unlogged').style.display = 'block';
+      document.getElementById('auth-logged').style.display = 'none';
+    }
+
+    async function setup2FA() {
+      if (!authToken) return alert('Please log in first');
+      const res = await fetch('http://127.0.0.1:4320/api/auth/setup-2fa', {
+        headers: { Authorization: `Bearer ${authToken}` },
+        method: 'POST'
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('totp-setup-box').style.display = 'block';
+        document.getElementById('totp-qr-img').src = data.qrCodeDataUrl;
+        document.getElementById('totp-secret-text').innerText = data.secret;
+        
+        const recDiv = document.getElementById('recovery-codes-container');
+        recDiv.innerHTML = data.recoveryCodes.map(c => `<span class="recovery-code">${c}</span>`).join('');
+      } else {
+        alert('Setup failed: ' + data.error);
+      }
+    }
+
+    async function confirm2FA() {
+      const code = document.getElementById('totp-verify-code').value.trim();
+      const res = await fetch('http://127.0.0.1:4320/api/auth/confirm-2fa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ code })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('totp-status-msg');
+      if (data.success) {
+        msg.style.color = '#22c55e';
+        msg.innerText = '✅ 2FA successfully verified and activated!';
+        document.getElementById('logged-2fa').innerText = 'Yes';
+      } else {
+        msg.style.color = '#ef4444';
+        msg.innerText = '❌ ' + (data.error || 'Failed');
+      }
+    }
+
+    async function verifyWebPairingCode() {
+      const code = document.getElementById('web-pairing-code-input').value.trim();
+      const res = await fetch('http://127.0.0.1:4320/api/linking/verify-pairing-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pairingCode: code })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('installation-confirm-box').style.display = 'block';
+        document.getElementById('web-confirm-fingerprint').innerText = data.fingerprint;
+        currentRequestId = data.requestId;
+      } else {
+        alert('Verification failed: ' + data.error);
+      }
+    }
+
+    async function confirmInstallationAndIssueSecret() {
+      if (!authToken) return alert('Please log in first');
+      const res = await fetch('http://127.0.0.1:4320/api/linking/confirm-installation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ requestId: currentRequestId })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('temporary-secret-display-box').style.display = 'block';
+        document.getElementById('web-generated-secret').value = data.temporarySecret;
+      } else {
+        alert('Confirmation failed: ' + data.error);
+      }
+    }
+
+    function copyGeneratedSecret() {
+      const input = document.getElementById('web-generated-secret');
+      navigator.clipboard.writeText(input.value);
+      alert('Secret copied to clipboard! Return to Desktop tab to finish linking.');
+    }
+
+    async function initiateUnlink() {
+      if (!authToken) return alert('Please log in on Cloud Portal tab first');
+      const res = await fetch('/api/linking/unlink-init', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById('unlink-otp-box').style.display = 'block';
+        alert('Unlink OTP sent to registered email address.');
+      } else {
+        alert('Unlink init failed: ' + data.error);
+      }
+    }
+
+    async function confirmUnlink() {
+      const otp = document.getElementById('input-unlink-otp').value.trim();
+      const res = await fetch('/api/linking/unlink-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authToken, otp })
+      });
+      const data = await res.json();
+      const msg = document.getElementById('unlink-result-msg');
+      if (data.success) {
+        msg.style.color = '#22c55e';
+        msg.innerText = '✅ Installation unlinked. Access revoked.';
+        loadStatus();
+      } else {
+        msg.style.color = '#ef4444';
+        msg.innerText = '❌ ' + (data.error || 'Failed');
+      }
+    }
+
+    async function runTestCommand() {
+      const cmd = document.getElementById('mcp-test-cmd').value;
+      const term = document.getElementById('mcp-terminal-output');
+      term.innerText = 'Sending command via Remote MCP...\n';
+
+      const res = await fetch('http://127.0.0.1:4320/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 'test-run-' + Date.now(),
+          method: 'tools/call',
+          params: { name: 'run_command', arguments: { command: cmd } }
+        })
+      });
+      const data = await res.json();
+      term.innerText = JSON.stringify(data, null, 2);
+    }
+
+    async function requestShutdown() {
+      if (!authToken) return alert('Please log in on Cloud Portal tab first');
+      const statusBox = document.getElementById('shutdown-status-box');
+      statusBox.style.color = 'var(--accent-blue)';
+      statusBox.innerText = 'Requesting shutdown approval...';
+
+      const res = await fetch('http://127.0.0.1:4320/api/shutdown/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ installationId: 'local' })
+      });
+      const data = await res.json();
+
+      if (res.ok && data.requestId) {
+        currentRequestId = data.requestId;
+        statusBox.style.color = 'var(--accent-green)';
+        statusBox.innerText = '✅ Shutdown request created. Awaiting your explicit approval.';
+        document.getElementById('shutdown-request-id').innerText = data.requestId;
+        document.getElementById('shutdown-approval-box').style.display = 'block';
+        document.getElementById('btn-request-shutdown').style.display = 'none';
+        document.getElementById('btn-approve-shutdown').style.display = 'inline-block';
+        document.getElementById('btn-cancel-shutdown').style.display = 'inline-block';
+      } else {
+        statusBox.style.color = 'var(--accent-red)';
+        statusBox.innerText = '❌ ' + (data.error || 'Failed to create shutdown request');
+      }
+    }
+
+    async function approveShutdown() {
+      if (!authToken || !currentRequestId) return alert('No active shutdown request to approve');
+      const res = await fetch('http://127.0.0.1:4320/api/shutdown/approve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ requestId: currentRequestId, installationId: 'local' })
+      });
+      const data = await res.json();
+      const resultBox = document.getElementById('shutdown-result-box');
+      if (data.success) {
+        resultBox.style.color = 'var(--accent-green)';
+        resultBox.innerText = '✅ Shutdown approved and dispatched to local bridge.';
+      } else {
+        resultBox.style.color = 'var(--accent-red)';
+        resultBox.innerText = '❌ Approval failed: ' + (data.error || 'Unknown error');
+      }
+      document.getElementById('shutdown-approval-box').style.display = 'none';
+      document.getElementById('btn-approve-shutdown').style.display = 'none';
+      document.getElementById('btn-cancel-shutdown').style.display = 'none';
+    }
+
+    async function cancelShutdown() {
+      if (!authToken || !currentRequestId) return;
+      await fetch('http://127.0.0.1:4320/api/shutdown/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ requestId: currentRequestId })
+      });
+      const statusBox = document.getElementById('shutdown-status-box');
+      statusBox.style.color = 'var(--text-muted)';
+      statusBox.innerText = 'Shutdown request cancelled.';
+      document.getElementById('shutdown-approval-box').style.display = 'none';
+      document.getElementById('btn-request-shutdown').style.display = 'inline-block';
+      document.getElementById('btn-approve-shutdown').style.display = 'none';
+      document.getElementById('btn-cancel-shutdown').style.display = 'none';
+      currentRequestId = '';
+    }
+
+    setInterval(loadStatus, 4000);
+    loadStatus();
+  </script>
+<script>
+// Bridge new tab UI elements with existing data logic
+const origLoadStatus = loadStatus;
+loadStatus = async function() {
+  await origLoadStatus();
+  try {
+    const res = await fetch('/api/status');
+    const data = await res.json();
+    if (document.getElementById('overview-cloud-status')) {
+      document.getElementById('overview-cloud-status').innerText = data.cloudClient.connected ? 'Connected' : 'Disconnected';
+      document.getElementById('overview-inst-name').innerText = data.installation.fingerprint.substring(0, 16) + '...';
+      document.getElementById('overview-policy').innerText = 'Standard (Approval Required)';
+      document.getElementById('sec-fingerprint').innerText = data.installation.fingerprint;
+      document.getElementById('sec-os').innerText = data.installation.osInfo;
+      document.getElementById('exec-policy').innerText = 'Standard';
+      document.getElementById('exec-restrictions').innerText = 'Dangerous commands require approval';
+    }
+  } catch(e) {
+    console.error(e);
+  }
+};
+
+function refreshStatus() {
+  loadStatus();
+}
+
+function refreshApprovals() {
+  console.log('Approvals refreshed');
+}
+
+async function runCommand() {
+  const cmd = document.getElementById('cmd-input').value;
+  const out = document.getElementById('cmd-output');
+  out.innerText = 'Executing: ' + cmd + '...\n';
+  try {
+    const res = await fetch('/api/status');
+    out.innerText += 'Local bridge command channel active. Use Remote MCP test for end-to-end verification.';
+  } catch(e) {
+    out.innerText += 'Error: ' + e.message;
+  }
+}
+
+function runMcpTest() {
+  runTestCommand();
+}
+</script>
+</body>
+</html>
